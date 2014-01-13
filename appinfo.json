@@ -1,0 +1,74 @@
+{
+  "uuid": "deda1158-4285-4a58-a29c-986d1c20bf8c",
+  "shortName": "Twilight-Clock",
+  "longName": "Twilight-Clock",
+  "capabilities": [ "location" ],
+  "companyName": "",
+  "versionCode": 2,
+  "versionLabel": "2.0.0",
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+    "getLatLong": 0,
+    "latitudeData": 1,
+    "longitudeData": 2,
+    "utcOffset": 3,
+    "locationFailCode": 4,
+    "locationFailMessage": 5
+  },
+
+  "resources": {
+    "media": [
+      {
+        "type": "png",
+        "name": "IMAGE_LIGHT_GREY",
+        "file": "images/light_grey.png"
+      },
+      {
+        "type": "png",
+        "name": "IMAGE_GREY",
+        "file": "images/grey.png"
+      },
+      {
+        "type": "png",
+        "name": "IMAGE_DARK_GREY",
+        "file": "images/dark_grey.png"
+      },
+      {
+        "type": "png-trans",
+        "name": "IMAGE_HOUR",
+        "file": "images/hour.png"
+      },
+      {
+        "menuIcon": true,
+        "type": "png",
+        "name": "IMAGE_MENU_ICON",
+        "file": "images/menu_icon_sunclock.png"
+      },
+      {
+        "type": "font",
+        "characterRegex": "[a-z01]",
+        "name": "FONT_MOON_PHASES_SUBSET_30",
+        "file": "fonts/moon_phases.ttf"
+      },
+      {
+        "type": "font",
+        "characterRegex": "[a-zA-Z, :0-9/]",
+        "name": "FONT_ROBOTO_CONDENSED_19",
+        "file": "fonts/Roboto-Condensed.ttf"
+      },
+      {
+        "type": "font",
+        "characterRegex": "[:0-9]",
+        "name": "FONT_ROBOTO_CONDENSED_42",
+        "file": "fonts/Roboto-Condensed.ttf"
+      },
+      {
+        "type": "png-trans",
+        "name": "IMAGE_WATCHFACE",
+        "file": "images/watchface.png"
+      }
+    ]
+  }
+}

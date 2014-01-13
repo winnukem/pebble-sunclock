@@ -1,4 +1,15 @@
+/**
+ *  @file
+ */
+
+#pragma once
+
+
+//  NB: IEEE single-precision float has a 24 bit significand,
+//      or about 7.2 significant decimal digits.
+//      Presumably, the extras given here don't hurt anything.
 #define M_PI 3.141592653589793
+
 float my_sqrt(const float x);
 float my_floor(float x); 
 float my_fabs(float x);

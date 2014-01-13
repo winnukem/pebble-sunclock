@@ -1,0 +1,19 @@
+Log of various space values reported by pebble build and runtime.
+All values are in bytes.
+
+Note that the build-reported "free" RAM is used for heap.
+
+                                 build      runtime heap
+                               code  free   avail  used   free heap
+12/31/2013  static location   11000?    ?       ?     ?        ?
+01/05/2014  dynamic location  14629  9947    9296  9080      216
+01/06/2014  cust msg fonts    14689  9887    9236  9080      156
+
+01/06/2014  built-in big nums 14713  9863    9212  9064      148
+01/06/2014  resource fonts    14689  9887    9236  9080      156
+01/06/2014  NO_RISE_SET_TIME  14697  9879
+
+01/11/2014  first beta5 bld   14750  9826    9192  9048      144
+
+01/11/2014  RISE_SET guard    14702  9874    9240  9048      192
+

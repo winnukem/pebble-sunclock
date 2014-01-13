@@ -1,522 +1,631 @@
-#include "pebble_os.h"
-#include "pebble_app.h"
-#include "pebble_fonts.h"
+/**
+ *  @file
+ *  
+ *  
+ *  Twilight clock watchface app.
+ *  
+ *  Present heap utilization, as reported by "pebble logs" at face exit:
+ *  
+ *    [INFO    ] I app_manager.c:134 Heap Usage for <Twilight-Clock>:
+ *               Available <12608B> Used <8668B> Still allocated <0B>
+ */
+
+#include "pebble.h"
+
 #include "config.h"
+#include "ConfigData.h"
+#include "helpers.h"
+#include "messaging.h"
 #include "my_math.h"
 #include "suncalc.h"
-#include "http.h"
-
-//#define MY_UUID {0x91,0x41,0xB6,0x28,0xBC,0x89,0x49,0x8E,0xB1,0x47,0x44,0x17,0xE0,0x5C,0xDE,0xD9}
-#define MY_UUID {0xA6,0x85,0xE5,0x63,0xEE,0xBA,0x46,0x26,0x91,0x9B,0x5E,0x8F,0x73,0x93,0x0C,0x13}
-
-#if ANDROID
-PBL_APP_INFO(MY_UUID,
-             "Twilight-Clock", "MichaelEhrmann,KarbonPebbler,Boldo,Chad Harp",
-             2, 0, /* App version */
-             RESOURCE_ID_IMAGE_MENU_ICON,
-             APP_INFO_WATCH_FACE);
-# else
-PBL_APP_INFO(HTTP_UUID,
-             "Twilight-Clock", "MichaelEhrmann,KarbonPebbler,Boldo,Chad Harp",
-             2, 0, /* App version */
-             RESOURCE_ID_IMAGE_MENU_ICON,
-             APP_INFO_WATCH_FACE);
-#endif
+#include "TransBitmap.h"
+#include "TransRotBmp.h"
+#include "TwilightPath.h"
 
 
-Window window;
+/// Test whether using a built-in font is smaller than using a (subsetted) resource.
+#define USE_FONT_RESOURCE 1   /* 0 == "use built-in font" */
+
+///  Main watchface window.
+Window *pWindow;
+
+///  pWindow & all supporting layers, etc. initialized ok?
+bool initialized_ok = false;
 
 #if HOUR_VIBRATION
 const VibePattern hour_pattern = {
-        .durations = (uint32_t []) {200, 100, 200, 100, 200},
-        .num_segments = 5
+   .durations = (uint32_t[]){ 200, 100, 200, 100, 200 },
+   .num_segments = 5
 };
 #endif
-	
-TextLayer text_time_layer;
-TextLayer text_sunrise_layer;
-TextLayer text_sunset_layer;
-TextLayer dow_layer;
-TextLayer mon_layer;
-TextLayer moonLayer; // moon phase
-Layer graphics_night_layer;
+
+TextLayer *pTextTimeLayer      = 0;
+TextLayer *pTextSunriseLayer   = 0;
+TextLayer *pTextSunsetLayer    = 0;
+TextLayer *pDayOfWeekLayer     = 0;
+TextLayer *pMonthLayer         = 0;
+TextLayer *pMoonLayer          = 0;   // moon phase
+
+///  Not a real layer, but the layer of the base window.
+///  This is where our watch "dial" (twilight bands, etc.) is drawn.
+Layer     *pGraphicsNightLayer = 0;
+
 //Make fonts global so we can deinit later
-GFont font_roboto;
-GFont font_moon;
-float realTimezone = TIMEZONE;
-float realLatitude = LATITUDE;
-float realLongitude = LONGITUDE;
+GFont pFontCurTime  = 0;
+GFont pFontMoon     = 0;
 
-RotBmpPairContainer bitmap_container;
-RotBmpPairContainer watchface_container;
-BmpContainer light_grey;
-BmpContainer grey;
-BmpContainer dark_grey;
+///  Roboto Condensed 19: "[a-zA-Z, :0-9]" chars only.  Used for face's date text.
+GFont pFontMediumText = 0;
 
-GPathInfo night_path_info = {
-  5,
-  (GPoint []) {
-    {0, 9},
-    {-73, +84}, //replaced by astronomical dawn angle
-    {-73, +84}, //bottom left
-    {+73, +84}, //bottom right
-    {+73, +84}, //replaced by astronomical dusk angle
-  }
-};
+// system font (Raster Gothic 18), doesn't need unloading:
+GFont pFontSmallText = 0;
 
-GPathInfo aTwilight_path_info = {
-  5,
-  (GPoint []) {
-    {0, 9},
-    {-73, -84}, //replaced by nautical dawn angle
-    {-73, -84}, //top left
-    {+73, -84}, //top right
-    {+73, -84}, //replaced by nautical dusk angle
-  }
-};
 
-GPathInfo nTwilight_path_info = {
-  5,
-  (GPoint []) {
-    {0, 9},
-    {-73, -84}, //replaced by civil dawn angle
-    {-73, -84}, //top left
-    {+73, -84}, //top right
-    {+73, -84}, //replaced by civil dusk angle
-  }
-};
+///  Hour hand bitmap, a transparent png which can rotate to any angle.
+TransRotBmp* pTransRotBmpHourHand = 0;
 
-GPathInfo cTwilight_path_info = {
-  5,
-  (GPoint []) {
-    {0, 9},
-    {-73, -84}, //replaced by sunrise angle
-    {-73, -84}, //top left
-    {+73, -84}, //top right
-    {+73, -84}, //replaced by sunset angle
-  }
-};
+/**
+ *  Watchface dial: a transparent png which supplies hour marks, a face
+ *  outline, and masks everything outside the face to black.  Aside from
+ *  the hour marks, the interior of the face is transparent to allow
+ *  twilight bands to show through.
+ */
+TransBitmap* pTransBmpWatchface = 0;
 
-GPath night_path;     //Night = black
-GPath aTwilight_path; //Astronomical Twilight = dark_grey
-GPath nTwilight_path; //Nautical Twilight = grey
-GPath cTwilight_path; //Civil Twilight = light_grey
+GBitmap* pBmpLightGrey = 0;
+GBitmap* pBmpMedGrey   = 0;
+GBitmap* pBmpDarkGrey  = 0;
 
-short currentData = -1;
+///  Boundary between night and astronomical twilight.
+TwilightPath* pTwiPathNight = 0;
 
-void graphics_night_layer_update_callback(Layer *me, GContext* ctx) 
+///  Boundary between astronomical and nautical twilight.
+TwilightPath* pTwiPathAstro = 0;
+
+///  Boundary between nautical and civil twilight.
+TwilightPath* pTwiPathNautical = 0;
+
+///  Daylight edge of civil twilight (i.e., sun rise / set times).
+TwilightPath* pTwiPathCivil = 0;
+
+
+
+/**
+ *  Handler called when the "night layer" needs redrawing.
+ *  
+ *  Note that the heavy calculation has been done ahead of time by
+ *  \href updateDayAndNightInfo(), so this callback should be a bit
+ *  zippier than it otherwise might be.  (Not to say "fast"..)
+ * 
+ * @param me Night layer being updated.
+ * @param ctx System-supplied context, presumably already set to defaults
+ *             for *me. 
+ */
+void graphics_night_layer_update_callback(Layer *me, GContext *ctx)
 {
-  (void)me;
 
-  gpath_init(&night_path, &night_path_info);
-  gpath_move_to(&night_path, grect_center_point(&graphics_night_layer.frame));
 
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  gpath_draw_filled(ctx, &night_path);  
-  
-  graphics_context_set_compositing_mode(ctx, GCompOpAnd);
+   GRect layerFrame = layer_get_frame(me);
 
-  bmp_init_container(RESOURCE_ID_IMAGE_DARK_GREY, &dark_grey);
-  graphics_draw_bitmap_in_rect(ctx, &dark_grey.bmp, GRect(0,0,144,168));
-  gpath_init(&aTwilight_path, &aTwilight_path_info);
-  gpath_move_to(&aTwilight_path, grect_center_point(&graphics_night_layer.frame));
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  gpath_draw_filled(ctx, &aTwilight_path);  
-	
-  bmp_init_container(RESOURCE_ID_IMAGE_GREY, &grey);
-  graphics_draw_bitmap_in_rect(ctx, &grey.bmp, GRect(0,0,144,168));
-  gpath_init(&nTwilight_path, &nTwilight_path_info);
-  gpath_move_to(&nTwilight_path, grect_center_point(&graphics_night_layer.frame));
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  gpath_draw_filled(ctx, &nTwilight_path);  
+   //BUGBUG: are these
+   //  GRect(0, 0, 144, 168)
+   //not equal to layerFrame?
 
-  bmp_init_container(RESOURCE_ID_IMAGE_LIGHT_GREY, &light_grey);
-  graphics_draw_bitmap_in_rect(ctx, &light_grey.bmp, GRect(0,0,144,168));
-  gpath_init(&cTwilight_path, &cTwilight_path_info);
-  gpath_move_to(&cTwilight_path, grect_center_point(&graphics_night_layer.frame));
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  gpath_draw_filled(ctx, &cTwilight_path);  
-	
-  graphics_context_set_compositing_mode(ctx, GCompOpAssign);
+   // ------------------------------------------------
+
+   //  start out with white screen, draw full-night black to bottom part
+   twilight_path_render(pTwiPathNight, ctx, NULL, GColorBlack, layerFrame);
+
+   //  turn all of white remainder (upper part of screen) into dark grey & then
+   //  turn upper part of screen above astro twilight band back into white
+   twilight_path_render(pTwiPathAstro, ctx, pBmpDarkGrey, GColorWhite, layerFrame);
+
+   //  turn all of white remainder (upper part of screen) into medium grey &
+   //  turn upper part of screen above nautical twilight band back into white
+   twilight_path_render(pTwiPathNautical, ctx, pBmpMedGrey, GColorWhite, layerFrame);
+
+   //  turn all of white remainder (upper part of screen) into light grey &
+   //  turn upper part of screen above civil twilight band back into white
+   twilight_path_render(pTwiPathCivil, ctx, pBmpLightGrey, GColorWhite, layerFrame);
+
+   // ------------------------------------------------
+
+   //  place tidy watchface frame over accumulated render of twilight bands:
+   transbitmap_draw_in_rect(pTransBmpWatchface, ctx, layerFrame);
+
+   //  not clear why this is done: perhaps the system needs it?
+   graphics_context_set_compositing_mode(ctx, GCompOpAssign);
+
+   return;
+
+}  /* end of graphics_night_layer_update_callback() */
+
+float get24HourAngle(int hours, int minutes)
+{
+   return (12.0f + hours + (minutes / 60.0f)) / 24.0f;
 }
 
-float get24HourAngle(int hours, int minutes) 
+/** 
+ *  Given a presumably UTC time, return the astronomical julian day.
+ *  This is not day-of-year, but a much larger value.
+ * 
+ *  @param timeUTC UTC time, unpacked.
+ */ 
+int tm2jd(struct tm *timeUTC)
 {
-  return (12.0f + hours + (minutes/60.0f)) / 24.0f;
-}
-
-void adjustTimezone(float* time) 
-{
-  *time += realTimezone;
-  if (*time > 24) *time -= 24;
-  if (*time < 0) *time += 24;
-}
-
-//return julian day number for time
-int tm2jd(PblTm *time)
-{
-    int y,m,d,a,b,c,e,f;
-    PblTm now;
-    get_time (&now);
-    y = now.tm_year + 1900;
-    m = now.tm_mon + 1;
-    d = now.tm_mday;
-    if (m < 3) 
-    {
-	m += 12;
-	y -= 1;
-    }
-    a = y/100;
-    b = a/4;
-    c = 2 - a + b;
-    e = 365.25*(y + 4716);
-    f = 30.6001*(m + 1);
-    return c+d+e+f-1524;
+   int y, m, d, a, b, c, e, f;
+   y = timeUTC->tm_year + 1900;
+   m = timeUTC->tm_mon + 1;
+   d = timeUTC->tm_mday;
+   if (m < 3)
+   {
+      m += 12;
+      y -= 1;
+   }
+   a = y / 100;
+   b = a / 4;
+   c = 2 - a + b;
+   e = 365.25 * (y + 4716);
+   f = 30.6001 * (m + 1);
+   return c + d + e + f - 1524;
 }
 
 
 int moon_phase(int jdn)
 {
-    double jd;
-    jd = jdn-2451550.1;
-    jd /= 29.530588853;
-    jd -= (int)jd;
-    return (int)(jd*27 + 0.5); // scale fraction from 0-27 and round by adding 0.5 
-}  
-
-
-// Called once per day
-void handle_day(AppContextRef ctx, PebbleTickEvent *t) {
-
-    (void)t;
-    (void)ctx;
-
-
-    static char moon[] = "m";
-    int moonphase_number = 0;
-
-    PblTm *time = t->tick_time;
-    if(!t)
-        get_time(time);
-
-    // moon
-    moonphase_number = moon_phase(tm2jd(time));
-    // correct for southern hemisphere
-    if ((moonphase_number > 0) && (realLatitude < 0))
-        moonphase_number = 28 - moonphase_number;
-    // select correct font char
-    if (moonphase_number == 14)
-    {
-        moon[0] = (unsigned char)(48);
-    } else if (moonphase_number == 0) {
-        moon[0] = (unsigned char)(49);
-    } else if (moonphase_number < 14) {
-        moon[0] = (unsigned char)(moonphase_number+96);
-    } else {
-        moon[0] = (unsigned char)(moonphase_number+95);
-    }
-//    moon[0] = (unsigned char)(moonphase_number);
-    text_layer_set_text(&moonLayer, moon);
+   double jd;
+   jd = jdn - 2451550.1;
+   jd /= 29.530588853;
+   jd -= (int)jd;
+   return (int)(jd * 27 + 0.5); // scale fraction from 0-27 and round by adding 0.5
 }
 
 
+/**
+ *  Update lunar phase.  Intended to be called once per day.
+ */
+void DisplayCurrentLunarPhase()
+{
 
+   static char moon[] = "m";
+   int moonphase_number = 0;
+
+   // moon
+   time_t timeNow;
+   timeNow = time(NULL);
+   moonphase_number = moon_phase(tm2jd(gmtime(&timeNow)));
+   // correct for southern hemisphere
+   if ((moonphase_number > 0) && (config_data_get_latitude() < 0))
+      moonphase_number = 28 - moonphase_number;
+
+   // select correct font char
+   if (moonphase_number == 14)
+   {
+      moon[0] = (unsigned char)(48);
+   } else if (moonphase_number == 0)
+   {
+      moon[0] = (unsigned char)(49);
+   } else if (moonphase_number < 14)
+   {
+      moon[0] = (unsigned char)(moonphase_number + 96);
+   } else
+   {
+      moon[0] = (unsigned char)(moonphase_number + 95);
+   }
+//    moon[0] = (unsigned char)(moonphase_number);
+
+   text_layer_set_text(pMoonLayer, moon);
+
+}  /* end of DisplayCurrentLunarPhase */
+
+
+/**
+ *  Calculate sunrise, sunset, and all corresponding twilight
+ *  times for current day.
+ *  
+ *  This only needs to be called once a day (aside from startup time).
+ * 
+ * @param update_everything True to update everything. False to
+ *                          only update when the day has
+ *                          changed.
+ */
 void updateDayAndNightInfo(bool update_everything)
 {
-  static char sunrise_text[] = "00:00";
-  static char sunset_text[] = "00:00";
+   static char sunrise_text[] = "00:00";
+   static char sunset_text[] = "00:00";
 
-  PblTm pblTime;
-  get_time(&pblTime);
+   ///  Localtime mday of most recent completed day/night update.
+   ///  This means we normally update just after midnight, which
+   ///  seems a good time.
+   static short lastUpdateDay = -1;
 
-  if(update_everything || currentData != pblTime.tm_hour) 
-  {
-    char *time_format;
 
-    if (clock_is_24h_style()) 
-    {
+   time_t timeNow;
+   timeNow = time(NULL);
+   struct tm tmNowLocal = *(localtime(&timeNow));
+
+   if ((lastUpdateDay == tmNowLocal.tm_mday) && !update_everything)
+   {
+      return;
+   }
+
+   twilight_path_compute_current(pTwiPathNight,    &tmNowLocal);
+   twilight_path_compute_current(pTwiPathAstro,    &tmNowLocal);
+   twilight_path_compute_current(pTwiPathNautical, &tmNowLocal);
+   twilight_path_compute_current(pTwiPathCivil,    &tmNowLocal);
+
+   //  Want the user's default time format, but not for the current time.
+   //  We can't use clock_copy_time_string(), so make an equivalent format:
+   char *time_format;
+
+   if (clock_is_24h_style())
+   {
       time_format = "%R";
-    } 
-    else 
-    {
+   } else
+   {
       time_format = "%l:%M";
-    }
+   }
 
-    float sunriseTime = calcSunRise(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_OFFICIAL);
-    float sunsetTime = calcSunSet(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_OFFICIAL);
-    float cDawnTime = calcSunRise(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_CIVIL);
-    float cDuskTime = calcSunSet(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_CIVIL);
-    float nDawnTime = calcSunRise(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_NAUTICAL);
-    float nDuskTime = calcSunSet(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_NAUTICAL);
-    float aDawnTime = calcSunRise(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_ASTRONOMICAL);
-    float aDuskTime = calcSunSet(pblTime.tm_year, pblTime.tm_mon+1, pblTime.tm_mday, realLatitude, realLongitude, ZENITH_ASTRONOMICAL);
-	  
-    adjustTimezone(&sunriseTime);
-    adjustTimezone(&sunsetTime);
-	adjustTimezone(&cDawnTime);
-    adjustTimezone(&cDuskTime);
-	adjustTimezone(&nDawnTime);
-    adjustTimezone(&nDuskTime);
-	adjustTimezone(&aDawnTime);
-    adjustTimezone(&aDuskTime);
-    
-    if (!pblTime.tm_isdst) 
-    {
-      sunriseTime+=1;
-      sunsetTime+=1;
-      cDawnTime+=1;
-      cDuskTime+=1;
-      nDawnTime+=1;
-      nDuskTime+=1;
-      aDawnTime+=1;
-      aDuskTime+=1;
-    } 
-    
-    pblTime.tm_min = (int)(60*(sunriseTime-((int)(sunriseTime))));
-    pblTime.tm_hour = (int)sunriseTime;
-    string_format_time(sunrise_text, sizeof(sunrise_text), time_format, &pblTime);
-    text_layer_set_text(&text_sunrise_layer, sunrise_text);
-    
-    pblTime.tm_min = (int)(60*(sunsetTime-((int)(sunsetTime))));
-    pblTime.tm_hour = (int)sunsetTime;
-    string_format_time(sunset_text, sizeof(sunset_text), time_format, &pblTime);
-    text_layer_set_text(&text_sunset_layer, sunset_text);
-    text_layer_set_text_alignment(&text_sunset_layer, GTextAlignmentRight);
+   float sunriseTime = pTwiPathCivil->fDawnTime;
+   float sunsetTime  = pTwiPathCivil->fDuskTime;
 
-    sunriseTime+=12.0f;
-    cTwilight_path_info.points[1].x = (int16_t)(my_sin(sunriseTime/24 * M_PI * 2) * 120);
-    cTwilight_path_info.points[1].y = 9 - (int16_t)(my_cos(sunriseTime/24 * M_PI * 2) * 120);
+   //BUGBUG - need to round this
+   tmNowLocal.tm_min = (int)(60 * (sunriseTime - ((int)(sunriseTime))));
+   tmNowLocal.tm_hour = (int)sunriseTime;
+   strftime(sunrise_text, sizeof(sunrise_text), time_format, &tmNowLocal);
+   text_layer_set_text(pTextSunriseLayer, sunrise_text);
 
-    sunsetTime+=12.0f;
-    cTwilight_path_info.points[4].x = (int16_t)(my_sin(sunsetTime/24 * M_PI * 2) * 120);
-    cTwilight_path_info.points[4].y = 9 - (int16_t)(my_cos(sunsetTime/24 * M_PI * 2) * 120);
+   tmNowLocal.tm_min = (int)(60 * (sunsetTime - ((int)(sunsetTime))));
+   tmNowLocal.tm_hour = (int)sunsetTime;
+   strftime(sunset_text, sizeof(sunset_text), time_format, &tmNowLocal);
+   text_layer_set_text(pTextSunsetLayer, sunset_text);
+   text_layer_set_text_alignment(pTextSunsetLayer, GTextAlignmentRight);
 
-	cDawnTime+=12.0f;
-    nTwilight_path_info.points[1].x = (int16_t)(my_sin(cDawnTime/24 * M_PI * 2) * 120);
-    nTwilight_path_info.points[1].y = 9 - (int16_t)(my_cos(cDawnTime/24 * M_PI * 2) * 120);
+   DisplayCurrentLunarPhase();
 
-    cDuskTime+=12.0f;
-    nTwilight_path_info.points[4].x = (int16_t)(my_sin(cDuskTime/24 * M_PI * 2) * 120);
-    nTwilight_path_info.points[4].y = 9 - (int16_t)(my_cos(cDuskTime/24 * M_PI * 2) * 120);
-	  
-	nDawnTime+=12.0f;
-    aTwilight_path_info.points[1].x = (int16_t)(my_sin(nDawnTime/24 * M_PI * 2) * 120);
-    aTwilight_path_info.points[1].y = 9 - (int16_t)(my_cos(nDawnTime/24 * M_PI * 2) * 120);
+   lastUpdateDay = tmNowLocal.tm_mday;
 
-    nDuskTime+=12.0f;
-    aTwilight_path_info.points[4].x = (int16_t)(my_sin(nDuskTime/24 * M_PI * 2) * 120);
-    aTwilight_path_info.points[4].y = 9 - (int16_t)(my_cos(nDuskTime/24 * M_PI * 2) * 120);
-	  
-	aDawnTime+=12.0f;
-    night_path_info.points[1].x = (int16_t)(my_sin(aDawnTime/24 * M_PI * 2) * 120);
-    night_path_info.points[1].y = 9 - (int16_t)(my_cos(aDawnTime/24 * M_PI * 2) * 120);
+   //  other layers should take care of themselves, but make sure our base
+   //  "dial" bitmap is updated.
+   layer_mark_dirty(pGraphicsNightLayer);
 
-    aDuskTime+=12.0f;
-    night_path_info.points[4].x = (int16_t)(my_sin(aDuskTime/24 * M_PI * 2) * 120);
-    night_path_info.points[4].y = 9 - (int16_t)(my_cos(aDuskTime/24 * M_PI * 2) * 120);
-  
-    currentData = pblTime.tm_hour;
-    
-    //Update location unless being called from location update
-    if (!update_everything) {
-      http_time_request();
-    }
-  }
-}
+}  /* end of updateDayAndNightInfo() */
 
-//Called if Httpebble is installed on phone.
-void have_time(int32_t dst_offset, bool is_dst, uint32_t unixtime, const char* tz_name, void* context) {
-  if (!is_dst) {
-    realTimezone = dst_offset/3600.0;
-  }
-  else {
-    realTimezone = (dst_offset/3600.0) - 1;
-  }
- 
-  //Now that we have timezone get location
-  http_location_request();	
-}
+/**
+ *  Once a minute, update textual time displays, and analog hour hand.
+ *  
+ *  Also calls out to daily updater, which limits itself to acting
+ *  only when due.
+ * 
+ *  @param tick_time The time at which the tick event was triggered.
+ *                At least in PebbleOS versions 2 and earlier, this
+ *                is local time.
+ *  @param units_changed Which unit change triggered this tick event.
+ *                Usually always minutes as that's all we register for.
+ */
 
-//Called if Httpebble is installed on phone.
-void have_location(float latitude, float longitude, float altitude, float accuracy, void* context) {
-	realLatitude = latitude;
-	realLongitude = longitude;  
-  
-  //Update screen to reflect correct Location information
-  updateDayAndNightInfo(true);
-}
-
-void handle_minute_tick(AppContextRef ctx, PebbleTickEvent *t) 
+static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-  (void)t;
-  (void)ctx;
 
-  // Need to be static because they're used by the system later.
-  static char time_text[] = "00:00";
-  static char dow_text[] = "xxx";
-  	string_format_time(dow_text, sizeof(dow_text), "%a", t->tick_time);	
-  static char mon_text[14];
-	string_format_time(mon_text, sizeof(mon_text), "%b %e, %Y", t->tick_time);
 
-  char *time_format;
+   (void) units_changed;
 
-  if (clock_is_24h_style()) 
-  {
-    time_format = "%R";
-  } 
-  else 
-  {
-    time_format = "%l:%M";
-  }
+   // Need to be static because they're used by the system later.
+   static char time_text[] = "00:00";
+   static char dow_text[] = "xxx";
+   static char mon_text[14];
 
-  string_format_time(time_text, sizeof(time_text), time_format, t->tick_time);
+   strftime(dow_text, sizeof(dow_text), "%a", tick_time);
+   strftime(mon_text, sizeof(mon_text), "%b %e, %Y", tick_time);
 
-  if (!clock_is_24h_style() && (time_text[0] == '0')) 
-  {
-    memmove(time_text, &time_text[1], sizeof(time_text) - 1);
-  }
+   clock_copy_time_string(time_text, sizeof(time_text));
+   if (!clock_is_24h_style() && (time_text[0] == '0'))
+   {
+      memmove(time_text, &time_text[1], sizeof(time_text) - 1);
+   }
 
-  text_layer_set_text(&dow_layer, dow_text);
-  text_layer_set_text(&mon_layer, mon_text);
-  
-  text_layer_set_text(&text_time_layer, time_text);
-  text_layer_set_text_alignment(&text_time_layer, GTextAlignmentCenter);
+   text_layer_set_text(pDayOfWeekLayer, dow_text);
+   text_layer_set_text(pMonthLayer, mon_text);
 
-  rotbmp_pair_layer_set_angle(&bitmap_container.layer, my_max((TRIG_MAX_ANGLE * get24HourAngle(t->tick_time->tm_hour, t->tick_time->tm_min)),1.0f));
-  bitmap_container.layer.layer.frame.origin.x = (144/2) - (bitmap_container.layer.layer.frame.size.w/2);
-  bitmap_container.layer.layer.frame.origin.y = (168/2) + 9 - (bitmap_container.layer.layer.frame.size.h/2);
+   text_layer_set_text(pTextTimeLayer, time_text);
+   text_layer_set_text_alignment(pTextTimeLayer, GTextAlignmentCenter);
+
+   //  update hour hand position
+   transrotbmp_set_angle(pTransRotBmpHourHand,
+                         TRIG_MAX_ANGLE * get24HourAngle(tick_time->tm_hour,
+                                                         tick_time->tm_min));
+
+   transrotbmp_set_pos_centered(pTransRotBmpHourHand, 0, 9 + 2);
 
 // Vibrate Every Hour
-  #if HOUR_VIBRATION
-	 
-    if ((t->tick_time->tm_min==0) && (t->tick_time->tm_sec==0))
-	{
-	vibes_enqueue_custom_pattern(hour_pattern);
-    }
-  #endif
-  
-  updateDayAndNightInfo(false);
-}
+#if HOUR_VIBRATION
+
+   if ((t->tick_time->tm_min == 0) && (t->tick_time->tm_sec == 0))
+   {
+      vibes_enqueue_custom_pattern(hour_pattern);
+   }
+#endif
+
+   updateDayAndNightInfo(false);
+
+}  /* end of handle_minute_tick() */
 
 
-void handle_init(AppContextRef ctx) {
-  (void)ctx;
-	
-  window_init(&window, "Twilight-Clock");
-  window_stack_push(&window, true /* Animated */);
-  window_set_background_color(&window, GColorWhite);
+/**
+ *  Do GUI layout for already-created window, and cache all needed resources.
+ *  Also register a tick handler, initialize watch/phone messaging, and request
+ *  current location data from the phone.
+ */
+static void  sunclock_window_load(Window * pMyWindow) 
+{
 
-  resource_init_current_app(&APP_RESOURCES);
-  font_moon = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_MOON_PHASES_SUBSET_30));
-  layer_init(&graphics_night_layer, window.layer.frame);
-  graphics_night_layer.update_proc = &graphics_night_layer_update_callback;
-  layer_add_child(&window.layer, &graphics_night_layer);
+   window_set_background_color(pWindow, GColorWhite);
 
-  rotbmp_pair_init_container(RESOURCE_ID_IMAGE_WATCHFACE_WHITE, RESOURCE_ID_IMAGE_WATCHFACE_BLACK, &watchface_container);
-  layer_add_child(&graphics_night_layer, &watchface_container.layer.layer);
-  rotbmp_pair_layer_set_angle(&watchface_container.layer, 1);
-  watchface_container.layer.layer.frame.origin.x = (144/2) - (watchface_container.layer.layer.frame.size.w/2);
-  watchface_container.layer.layer.frame.origin.y = (168/2) - (watchface_container.layer.layer.frame.size.h/2);
+   pFontMoon = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_MOON_PHASES_SUBSET_30));
 
-  text_layer_init(&text_time_layer, window.layer.frame);
-  text_layer_set_text_color(&text_time_layer, GColorBlack);
-  text_layer_set_background_color(&text_time_layer, GColorClear);
-  layer_set_frame(&text_time_layer.layer, GRect(0, 36, 144, 42));
-  text_layer_set_font(&text_time_layer, fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_42)));
-  layer_add_child(&window.layer, &text_time_layer.layer);
+#if USE_FONT_RESOURCE
+   pFontCurTime = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_42));
+#else
+   pFontCurTime = fonts_get_system_font(FONT_KEY_DROID_SERIF_28_BOLD);
+#endif
 
-  rotbmp_pair_init_container(RESOURCE_ID_IMAGE_HOUR_WHITE, RESOURCE_ID_IMAGE_HOUR_BLACK, &bitmap_container);
-  rotbmp_pair_layer_set_src_ic(&bitmap_container.layer, GPoint(9,56));
-  layer_add_child(&window.layer, &bitmap_container.layer.layer);
+   pFontMediumText = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19));
 
-  text_layer_init(&moonLayer, GRect(0, 109, 144, 168-115));
-  text_layer_set_text_color(&moonLayer, GColorWhite);
-  text_layer_set_background_color(&moonLayer, GColorClear);
-  text_layer_set_font(&moonLayer, font_moon);
-  text_layer_set_text_alignment(&moonLayer, GTextAlignmentCenter);
 
-  handle_day(ctx, NULL);
-	
-  layer_add_child(&window.layer, &moonLayer.layer);
-	
-PblTm t;
-  get_time(&t);
-  rotbmp_pair_layer_set_angle(&bitmap_container.layer, TRIG_MAX_ANGLE * get24HourAngle(t.tm_hour, t.tm_min));
-  bitmap_container.layer.layer.frame.origin.x = (144/2) - (bitmap_container.layer.layer.frame.size.w/2);
-  bitmap_container.layer.layer.frame.origin.y = (168/2) + 9 - (bitmap_container.layer.layer.frame.size.h/2);
+   //BUGBUG - The v2 SDK docs suggest that we should do our base bitmap
+   //  graphics directly in the window root layer, rather than creating a
+   //  separate layer just for the bitmaps (& not using the base window's layer).
+//   pGraphicsNightLayer = layer_create(layer_get_bounds(window_get_root_layer(pWindow)));
+   pGraphicsNightLayer = window_get_root_layer(pWindow);
+   if (pGraphicsNightLayer == NULL)
+   {
+      return;
+   }
+   layer_set_update_proc(pGraphicsNightLayer, graphics_night_layer_update_callback); 
+//   layer_add_child(window_get_root_layer(pWindow), pGraphicsNightLayer);
 
-  //Day of Week text
-  text_layer_init(&dow_layer, GRect(0, 0, 144, 127+26));
-  text_layer_set_text_color(&dow_layer, GColorWhite);
-  text_layer_set_background_color(&dow_layer, GColorClear);
-  text_layer_set_font(&dow_layer, fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19)));
-  text_layer_set_text_alignment(&dow_layer, GTextAlignmentLeft);
-  text_layer_set_text(&dow_layer, "xxx");
-  layer_add_child(&window.layer, &dow_layer.layer);
 
-  //Month Text
-  text_layer_init(&mon_layer, GRect(0, 0, 144, 127+26));
-  text_layer_set_text_color(&mon_layer, GColorWhite);
-  text_layer_set_background_color(&mon_layer, GColorClear);
-  text_layer_set_font(&mon_layer, fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19)));
-  text_layer_set_text_alignment(&mon_layer, GTextAlignmentRight);
-  text_layer_set_text(&mon_layer, "xxx");
-  layer_add_child(&window.layer, &mon_layer.layer);
+   pBmpDarkGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DARK_GREY);
+   pBmpMedGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_GREY);
+   pBmpLightGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_LIGHT_GREY);
+   if ((pBmpDarkGrey == NULL) || (pBmpMedGrey == NULL) || (pBmpLightGrey == NULL))
+   {
+      return;
+   }
 
-  //Sunrise Text 
-  text_layer_init(&text_sunrise_layer, window.layer.frame);
-  text_layer_set_text_color(&text_sunrise_layer, GColorWhite);
-  text_layer_set_background_color(&text_sunrise_layer, GColorClear);
-  layer_set_frame(&text_sunrise_layer.layer, GRect(0, 147, 144, 30));
-  text_layer_set_font(&text_sunrise_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  layer_add_child(&window.layer, &text_sunrise_layer.layer);
+   pTransBmpWatchface = transbitmap_create_with_resource_prefix(RESOURCE_ID_IMAGE_WATCHFACE);
+   if (pTransBmpWatchface == NULL)
+   {
+      return;
+   }
 
- //Sunset Text
-  text_layer_init(&text_sunset_layer, window.layer.frame);
-  text_layer_set_text_color(&text_sunset_layer, GColorWhite);
-  text_layer_set_background_color(&text_sunset_layer, GColorClear);
-  layer_set_frame(&text_sunset_layer.layer, GRect(0, 147, 144, 30));
-  text_layer_set_font(&text_sunset_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  layer_add_child(&window.layer, &text_sunset_layer.layer); 
+   //  Yes, the apparent mismatch between ZENITH_ names and TwilightPath instance
+   //  names is intended (if a bit unfortunate).
+   pTwiPathNight    = twilight_path_create(ZENITH_ASTRONOMICAL, ENCLOSE_SCREEN_BOTTOM);
+   pTwiPathAstro    = twilight_path_create(ZENITH_NAUTICAL,     ENCLOSE_SCREEN_TOP);
+   pTwiPathNautical = twilight_path_create(ZENITH_CIVIL,        ENCLOSE_SCREEN_TOP);
+   pTwiPathCivil    = twilight_path_create(ZENITH_OFFICIAL,     ENCLOSE_SCREEN_TOP);
+   if ((pTwiPathNight == NULL) || (pTwiPathAstro == NULL) ||
+       (pTwiPathNautical == NULL) || (pTwiPathCivil == NULL))
+   {
+      return;
+   }
 
-  http_set_app_id(55122370);
+   // time of day text
+   pTextTimeLayer = text_layer_create(GRect(0, 36, 144, 42));
+   if (pTextTimeLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pTextTimeLayer, GColorBlack); 
+   text_layer_set_background_color(pTextTimeLayer, GColorClear);
+   text_layer_set_font(pTextTimeLayer, pFontCurTime);
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pTextTimeLayer));
 
-  http_register_callbacks((HTTPCallbacks){
-    .time=have_time,
-    .location=have_location
-  }, (void*)ctx);
+   pMoonLayer = text_layer_create(GRect(0, 109, 144, 168 - 115));
+   if (pMoonLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pMoonLayer, GColorWhite);
+   text_layer_set_background_color(pMoonLayer, GColorClear);
+   text_layer_set_font(pMoonLayer, pFontMoon);
+   text_layer_set_text_alignment(pMoonLayer, GTextAlignmentCenter);
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pMoonLayer));
 
-  http_time_request();
+   //  Add hour hand after moon phase:  looks weird (wrong) to see phase
+   //  on top of the hour hand.
+   pTransRotBmpHourHand = transrotbmp_create_with_resource_prefix(RESOURCE_ID_IMAGE_HOUR);
+   if (pTransRotBmpHourHand == NULL)
+   {
+      return;
+   }
+   transrotbmp_set_src_ic(pTransRotBmpHourHand, GPoint(9, 56));
+   transrotbmp_add_to_layer(pTransRotBmpHourHand, window_get_root_layer(pWindow));
 
-  updateDayAndNightInfo(false);
-}
+   //  This hour hand update appears redundant with handle_minute_tick(),
+   //  but in fact is needed to avoid a really weird default hour hand
+   //  position on initial app window display.
+   time_t timeNow = time(NULL);
+   struct tm * pLocalTime = localtime(&timeNow);
+   transrotbmp_set_angle(pTransRotBmpHourHand,
+                         TRIG_MAX_ANGLE * get24HourAngle(pLocalTime->tm_hour,
+                                                         pLocalTime->tm_min));
+   transrotbmp_set_pos_centered(pTransRotBmpHourHand, 0, 9);
 
-void handle_deinit(AppContextRef ctx) {
-  (void)ctx;
+   //  Same rectangle used for day of week and date text:
+   //  text alignment avoids conflicts in the two layers.
+   GRect DayDateTextRect;
+   DayDateTextRect = GRect(0, 0, 144, 127 + 26);
 
-  rotbmp_pair_deinit_container(&watchface_container);
-  rotbmp_pair_deinit_container(&bitmap_container);
-  bmp_deinit_container(&light_grey);
-  bmp_deinit_container(&grey);
-  bmp_deinit_container(&dark_grey);
-  fonts_unload_custom_font(font_moon);
-}
+   //Day of Week text
+   pDayOfWeekLayer = text_layer_create(DayDateTextRect);
+   if (pDayOfWeekLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pDayOfWeekLayer, GColorWhite); 
+   text_layer_set_background_color(pDayOfWeekLayer, GColorClear);
+   text_layer_set_font(pDayOfWeekLayer, pFontMediumText);
+   text_layer_set_text_alignment(pDayOfWeekLayer, GTextAlignmentLeft);
+   text_layer_set_text(pDayOfWeekLayer, "xxx");
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pDayOfWeekLayer));
 
-void pbl_main(void *params) {
-  PebbleAppHandlers handlers = {
-    .init_handler = &handle_init,
-    .deinit_handler = &handle_deinit,
+   //Month Text
+   pMonthLayer = text_layer_create(DayDateTextRect);
+   if (pMonthLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pMonthLayer, GColorWhite);
+   text_layer_set_background_color(pMonthLayer, GColorClear);
+   text_layer_set_font(pMonthLayer, pFontMediumText);
+   text_layer_set_text_alignment(pMonthLayer, GTextAlignmentRight);
+   text_layer_set_text(pMonthLayer, "xxx");
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pMonthLayer));
 
-    .tick_info = {
-      .tick_handler = &handle_minute_tick,
-      .tick_units = MINUTE_UNIT
-    },
-    .messaging_info = {
-      .buffer_sizes = {
-        .inbound = 124,
-        .outbound = 124,
-      }
-    }
-  };
-  app_event_loop(params, &handlers);
-}
+   pFontSmallText = fonts_get_system_font(FONT_KEY_GOTHIC_18);
+
+   //  Same rectangle used for sunrise / sunset text layers: updateDayAndNightInfo()
+   //  changes sunset text to right-aligned.
+   GRect SunRiseSetTextRect;
+   SunRiseSetTextRect = GRect(0, 147, 144, 30);
+
+   //Sunrise Text
+   pTextSunriseLayer = text_layer_create(SunRiseSetTextRect);
+   if (pTextSunriseLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pTextSunriseLayer, GColorWhite);
+   text_layer_set_background_color(pTextSunriseLayer, GColorClear);
+   text_layer_set_font(pTextSunriseLayer, pFontSmallText);
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pTextSunriseLayer));
+
+   //Sunset Text
+   // NB: uses same rectangle as Sunrise, but updateDayAndNightInfo()
+   //     sets Sunset text to right-aligned.
+   pTextSunsetLayer = text_layer_create(SunRiseSetTextRect);
+   if (pTextSunsetLayer == NULL)
+   {
+      return;
+   }
+   text_layer_set_text_color(pTextSunsetLayer, GColorWhite); 
+   text_layer_set_background_color(pTextSunsetLayer, GColorClear);
+   text_layer_set_font(pTextSunsetLayer, pFontSmallText);
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pTextSunsetLayer));
+
+   updateDayAndNightInfo(false);
+
+   app_msg_RequestLatLong();
+
+   tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+
+   initialized_ok = true;
+
+}  /* end of sunclock_window_load */
+
+
+/** 
+ *  Release all resources and registrations allocated by
+ *  \ref sunclock_window_load().
+ */
+static void  sunclock_window_unload(Window * pMyWindow)
+{
+
+   tick_timer_service_unsubscribe();
+
+   SAFE_DESTROY(text_layer, pTextSunsetLayer);
+   SAFE_DESTROY(text_layer, pTextSunriseLayer);
+   SAFE_DESTROY(text_layer, pMonthLayer);
+   SAFE_DESTROY(text_layer, pDayOfWeekLayer);
+   SAFE_DESTROY(text_layer, pMoonLayer);
+   SAFE_DESTROY(text_layer, pTextTimeLayer);
+   SAFE_DESTROY(layer,      pGraphicsNightLayer);
+
+   transbitmap_destroy(pTransBmpWatchface);
+   pTransBmpWatchface = 0;
+
+   transrotbmp_destroy(pTransRotBmpHourHand);
+   pTransRotBmpHourHand = 0;
+
+   SAFE_DESTROY(gbitmap, pBmpLightGrey);
+   SAFE_DESTROY(gbitmap, pBmpMedGrey);
+   SAFE_DESTROY(gbitmap, pBmpDarkGrey);
+
+   SAFE_DESTROY(twilight_path, pTwiPathNight);
+   SAFE_DESTROY(twilight_path, pTwiPathAstro);
+   SAFE_DESTROY(twilight_path, pTwiPathNautical);
+   SAFE_DESTROY(twilight_path, pTwiPathCivil);
+
+}  /* end of sunclock_window_unload() */
+
+
+void sunclock_coords_recvd(float latitude, float longitude, int32_t utcOffset)
+{
+
+   APP_LOG(APP_LOG_LEVEL_DEBUG, "got coords, utcOff=%d", (int) utcOffset);
+
+   if (config_data_is_different(latitude, longitude, utcOffset))
+   {
+      config_data_location_set(latitude, longitude, utcOffset); 
+
+      updateDayAndNightInfo(true /* update_everything */);
+   }
+
+}  /* end of sunclock_coords_recvd */
+
+
+/**
+ *  Create base watchface window.  We're called outside of the event loop,
+ *  so we do as little as possible here.
+ */
+void  sunclock_handle_init()
+{
+
+
+   pWindow = window_create();
+   if (pWindow == NULL)
+   {
+      // oh well.
+      return;
+   }
+
+   //  Defer the bulk of our start up a load handler.  In particular, it seems
+   //  better to do app_message stuff there, once our event loop is running.
+   window_set_window_handlers(pWindow,
+                              (WindowHandlers) {
+                                 .load = sunclock_window_load,
+                                 .unload = sunclock_window_unload,
+                               });
+
+   window_stack_push(pWindow, true /* Animated */);
+
+}  /* end of sunclock_handle_init() */
+
+/**
+ *  Called at application shutdown / exit.  Releases all dynamic storage
+ *  allocated by \href handle_init() et al.
+ */
+void sunclock_handle_deinit()
+{
+
+   SAFE_DESTROY(window, pWindow);
+
+   //  Do these here since they're shared with another app window.
+   //  The SDK hints that the window unload function might be called
+   //  before window destruction, in future SDK releases.
+   fonts_unload_custom_font(pFontMediumText);
+   fonts_unload_custom_font(pFontMoon);
+#if USE_FONT_RESOURCE
+   fonts_unload_custom_font(pFontCurTime);
+#endif
+
+}  /* end of sunclock_handle_deinit */
+
