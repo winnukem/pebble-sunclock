@@ -72,10 +72,6 @@ TransRotBmp* pTransRotBmpHourHand = 0;
  */
 TransBitmap* pTransBmpWatchface = 0;
 
-GBitmap* pBmpLightGrey = 0;
-GBitmap* pBmpMedGrey   = 0;
-GBitmap* pBmpDarkGrey  = 0;
-
 ///  Boundary between night and astronomical twilight.
 TwilightPath* pTwiPathNight = 0;
 
@@ -114,19 +110,19 @@ void graphics_night_layer_update_callback(Layer *me, GContext *ctx)
    // ------------------------------------------------
 
    //  start out with white screen, draw full-night black to bottom part
-   twilight_path_render(pTwiPathNight, ctx, NULL, GColorBlack, layerFrame);
+   twilight_path_render(pTwiPathNight, ctx, GColorBlack, layerFrame);
 
    //  turn all of white remainder (upper part of screen) into dark grey & then
    //  turn upper part of screen above astro twilight band back into white
-   twilight_path_render(pTwiPathAstro, ctx, pBmpDarkGrey, GColorWhite, layerFrame);
+   twilight_path_render(pTwiPathAstro, ctx, GColorWhite, layerFrame);
 
    //  turn all of white remainder (upper part of screen) into medium grey &
    //  turn upper part of screen above nautical twilight band back into white
-   twilight_path_render(pTwiPathNautical, ctx, pBmpMedGrey, GColorWhite, layerFrame);
+   twilight_path_render(pTwiPathNautical, ctx, GColorWhite, layerFrame);
 
    //  turn all of white remainder (upper part of screen) into light grey &
    //  turn upper part of screen above civil twilight band back into white
-   twilight_path_render(pTwiPathCivil, ctx, pBmpLightGrey, GColorWhite, layerFrame);
+   twilight_path_render(pTwiPathCivil, ctx, GColorWhite, layerFrame);
 
    // ------------------------------------------------
 
@@ -385,14 +381,6 @@ static void  sunclock_window_load(Window * pMyWindow)
 //   layer_add_child(window_get_root_layer(pWindow), pGraphicsNightLayer);
 
 
-   pBmpDarkGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_DARK_GREY);
-   pBmpMedGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_GREY);
-   pBmpLightGrey = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_LIGHT_GREY);
-   if ((pBmpDarkGrey == NULL) || (pBmpMedGrey == NULL) || (pBmpLightGrey == NULL))
-   {
-      return;
-   }
-
    pTransBmpWatchface = transbitmap_create_with_resource_prefix(RESOURCE_ID_IMAGE_WATCHFACE);
    if (pTransBmpWatchface == NULL)
    {
@@ -401,10 +389,14 @@ static void  sunclock_window_load(Window * pMyWindow)
 
    //  Yes, the apparent mismatch between ZENITH_ names and TwilightPath instance
    //  names is intended (if a bit unfortunate).
-   pTwiPathNight    = twilight_path_create(ZENITH_ASTRONOMICAL, ENCLOSE_SCREEN_BOTTOM);
-   pTwiPathAstro    = twilight_path_create(ZENITH_NAUTICAL,     ENCLOSE_SCREEN_TOP);
-   pTwiPathNautical = twilight_path_create(ZENITH_CIVIL,        ENCLOSE_SCREEN_TOP);
-   pTwiPathCivil    = twilight_path_create(ZENITH_OFFICIAL,     ENCLOSE_SCREEN_TOP);
+   pTwiPathNight    = twilight_path_create(ZENITH_ASTRONOMICAL, ENCLOSE_SCREEN_BOTTOM,
+                                           INVALID_RESOURCE);
+   pTwiPathAstro    = twilight_path_create(ZENITH_NAUTICAL,     ENCLOSE_SCREEN_TOP,
+                                           RESOURCE_ID_IMAGE_DARK_GREY);
+   pTwiPathNautical = twilight_path_create(ZENITH_CIVIL,        ENCLOSE_SCREEN_TOP,
+                                           RESOURCE_ID_IMAGE_GREY);
+   pTwiPathCivil    = twilight_path_create(ZENITH_OFFICIAL,     ENCLOSE_SCREEN_TOP,
+                                           RESOURCE_ID_IMAGE_LIGHT_GREY);
    if ((pTwiPathNight == NULL) || (pTwiPathAstro == NULL) ||
        (pTwiPathNautical == NULL) || (pTwiPathCivil == NULL))
    {
@@ -554,10 +546,6 @@ static void  sunclock_window_unload(Window * pMyWindow)
 
    transrotbmp_destroy(pTransRotBmpHourHand);
    pTransRotBmpHourHand = 0;
-
-   SAFE_DESTROY(gbitmap, pBmpLightGrey);
-   SAFE_DESTROY(gbitmap, pBmpMedGrey);
-   SAFE_DESTROY(gbitmap, pBmpDarkGrey);
 
    SAFE_DESTROY(twilight_path, pTwiPathNight);
    SAFE_DESTROY(twilight_path, pTwiPathAstro);

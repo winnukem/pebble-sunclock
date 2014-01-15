@@ -34,6 +34,12 @@ typedef enum {
  *  
  *  Our computed path coords are relative, using as a zero-point the axis
  *  of the hour hand's rotation.
+ *  
+ *  This structure also includes an optional bitmap resource.  When
+ *  present, the bitmap is rendered immediately before we fill our path.
+ *  When a bitmap is present, our path fill typically is used to carve out
+ *  part of the bitmap (which can only be rendered to a rectangle) and
+ *  change it back to white.
  */
 typedef struct {
 
@@ -63,6 +69,13 @@ typedef struct {
 
    ///  Derived from the above, and ready for use with Pebble graphics primitives.
    GPath *pPath;
+
+   /**
+    *  Bitmap resource to render to screen immediately before path fill.
+    *  NULL if there is no bitmap to render (i.e., for our initial
+    *  black-fill of the bottom part of the screen).
+    */
+   GBitmap* pBmpGrey;   // some shade of gray
 
    /**
     *  Zenith value for our path.  This is the angle between the sun's zenith
@@ -100,8 +113,11 @@ typedef struct {
  *  @param zenithAngle Angle in degrees of sun position relative to zenith
  *             which we should use in calculating our graphics path.
  *  @param toEnclose Should graphics path enclose top or bottom of screen?
+ *  @param bitmapResId Resource ID of bitmap to use when rendering.
+ *                Set to INVALID_RESOURCE for no bitmap.
  */
-TwilightPath * twilight_path_create(float zenithAngle, ScreenPartToEnclose toEnclose);
+TwilightPath * twilight_path_create(float zenithAngle, ScreenPartToEnclose toEnclose,
+                                    uint32_t greyBitmapResourceId);
 
 
 /**
@@ -121,21 +137,19 @@ void  twilight_path_compute_current(TwilightPath *pTwilightPath,
 
 
 /**
- *  Render optional bitmap to full screen, using GCompAnd compositing, and then
- *  fill our path with the specified color.  Thus we write the bitmap and then
- *  carve out a chunk of it corresponding to the "daytime" part beyond our
- *  twilight range.
+ *  Render optional bitmap (specified during _create()) to full screen using
+ *  GCompAnd compositing, and then fill our path with the specified color.
+ *  Thus we write the bitmap and then carve out a chunk of it corresponding
+ *  to the "daytime" part beyond our twilight range.
  * 
  *  @param pTwilightPath Contains path info for filling.
  *  @param ctx Graphics context to render to.  Iff we are supplied a bitmap
  *              then we change the context's compositing mode to GCompAnd.
- *  @param pBitmap Bitmap to write to screen before filling our path.
- *              If NULL then no bitmap is written.
  *  @param color Color to fill our path with.
  *  @param frameDst Frame to constrain rendering to (whole window).
  */
 void  twilight_path_render(TwilightPath *pTwilightPath, GContext *ctx,
-                           GBitmap* pBitmap, GColor color, GRect frameDst);
+                           GColor color, GRect frameDst);
 
 
 void  twilight_path_destroy(TwilightPath *pTwilightPath);

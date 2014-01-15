@@ -7,6 +7,7 @@
 #include  "TwilightPath.h"
 
 #include  "ConfigData.h"
+#include  "helpers.h"
 #include  "my_math.h"
 #include  "suncalc.h"
 
@@ -19,7 +20,8 @@
 #define Y_BOTTOM  (84)
 
 
-TwilightPath * twilight_path_create(float zenithAngle, ScreenPartToEnclose toEnclose)
+TwilightPath * twilight_path_create(float zenithAngle, ScreenPartToEnclose toEnclose,
+                                    uint32_t greyBitmapResourceId)
 {
 
    TwilightPath * pMyRet = malloc(sizeof(TwilightPath));
@@ -30,6 +32,20 @@ TwilightPath * twilight_path_create(float zenithAngle, ScreenPartToEnclose toEnc
 
    pMyRet->fZenith = zenithAngle;
    pMyRet->toEnclose = toEnclose;
+
+   if (greyBitmapResourceId != INVALID_RESOURCE)
+   {
+      pMyRet->pBmpGrey = gbitmap_create_with_resource(greyBitmapResourceId);
+      if (pMyRet->pBmpGrey == NULL)
+      {
+         free(pMyRet);
+         return NULL;
+      }
+   }
+   else
+   {
+      pMyRet->pBmpGrey = NULL;
+   }
 
    //  Most path points are constant for life of this TwilightPath instance
    //  (they depend only on ScreenPartToEnclose).  But the point order varies
@@ -173,7 +189,7 @@ const float timeFudge = 12.0f;
 
 
 void  twilight_path_render(TwilightPath *pTwilightPath, GContext *ctx,
-                           GBitmap* pBitmap, GColor color, GRect frameDst)
+                           GColor color, GRect frameDst)
 {
 
 
@@ -198,10 +214,10 @@ void  twilight_path_render(TwilightPath *pTwilightPath, GContext *ctx,
 
    //  do rendering
 
-   if (pBitmap != NULL)
+   if (pTwilightPath->pBmpGrey != NULL)
    {
       graphics_context_set_compositing_mode(ctx, GCompOpAnd); 
-      graphics_draw_bitmap_in_rect(ctx, pBitmap, frameDst);
+      graphics_draw_bitmap_in_rect(ctx, pTwilightPath->pBmpGrey, frameDst);
    }
 
    graphics_context_set_fill_color(ctx, color);
@@ -218,11 +234,8 @@ void  twilight_path_destroy(TwilightPath *pTwilightPath)
 
    if (pTwilightPath != 0)
    {
-      if (pTwilightPath->pPath != 0)
-      {
-         gpath_destroy(pTwilightPath->pPath);
-         pTwilightPath->pPath = 0;
-      }
+      SAFE_DESTROY(gpath, pTwilightPath->pPath);
+      SAFE_DESTROY(gbitmap, pTwilightPath->pBmpGrey);
 
       free(pTwilightPath);
    }
