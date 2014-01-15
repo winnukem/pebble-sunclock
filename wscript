@@ -14,9 +14,10 @@ def options(ctx):
 def configure(ctx):
     ctx.load('pebble_sdk')
 
-    print(type(ctx.env))
-    print(ctx.env)
-    print(ctx.env.FOO)
+# Uncommenting these shows compiler's env vars, including -Os CFLAG.
+#    print(type(ctx.env))
+#    print(ctx.env)
+#    print(ctx.env.FOO)
 
 def build(ctx):
     ctx.load('pebble_sdk')
