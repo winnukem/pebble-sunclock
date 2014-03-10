@@ -19,3 +19,12 @@ Note that the build-reported "free" RAM is used for heap.
 
 01/13/2014  bmp in twilight   14578  9998    9364  9064      300
 
+01/14/2014  bare tap framewk  14681  9895    9260  9064      196
+
+01/20/2014  b5 app in b6 firm                9368  9064      304
+
+01/20/2014  b6 build in b6    14578  9998    9368  9064      304
+
+03/09/2014  call tick at load 14530 10046    9404  9056      348
+
+

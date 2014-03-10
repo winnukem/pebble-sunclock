@@ -437,16 +437,6 @@ static void  sunclock_window_load(Window * pMyWindow)
    transrotbmp_set_src_ic(pTransRotBmpHourHand, GPoint(9, 56));
    transrotbmp_add_to_layer(pTransRotBmpHourHand, window_get_root_layer(pWindow));
 
-   //  This hour hand update appears redundant with handle_minute_tick(),
-   //  but in fact is needed to avoid a really weird default hour hand
-   //  position on initial app window display.
-   time_t timeNow = time(NULL);
-   struct tm * pLocalTime = localtime(&timeNow);
-   transrotbmp_set_angle(pTransRotBmpHourHand,
-                         TRIG_MAX_ANGLE * get24HourAngle(pLocalTime->tm_hour,
-                                                         pLocalTime->tm_min));
-   transrotbmp_set_pos_centered(pTransRotBmpHourHand, 0, 9);
-
    //  Same rectangle used for day of week and date text:
    //  text alignment avoids conflicts in the two layers.
    GRect DayDateTextRect;
@@ -487,7 +477,6 @@ static void  sunclock_window_load(Window * pMyWindow)
    GRect SunRiseSetTextRect;
    SunRiseSetTextRect = GRect(0, 147, 144, 30);
 
-   //Sunrise Text
    pTextSunriseLayer = text_layer_create(SunRiseSetTextRect);
    if (pTextSunriseLayer == NULL)
    {
@@ -499,9 +488,6 @@ static void  sunclock_window_load(Window * pMyWindow)
    layer_add_child(window_get_root_layer(pWindow),
                    text_layer_get_layer(pTextSunriseLayer));
 
-   //Sunset Text
-   // NB: uses same rectangle as Sunrise, but updateDayAndNightInfo()
-   //     sets Sunset text to right-aligned.
    pTextSunsetLayer = text_layer_create(SunRiseSetTextRect);
    if (pTextSunsetLayer == NULL)
    {
@@ -513,8 +499,15 @@ static void  sunclock_window_load(Window * pMyWindow)
    layer_add_child(window_get_root_layer(pWindow),
                    text_layer_get_layer(pTextSunsetLayer));
 
-   updateDayAndNightInfo(false);
+   //  Run initial tick processing before our window displays, so that all
+   //  text fields are populated initially.
+   time_t timeNow = time(NULL);
+   struct tm * pLocalTime = localtime(&timeNow);
 
+   handle_minute_tick(pLocalTime, MINUTE_UNIT);
+
+   //  On window load (i.e., at watchface startup) request latest coords.
+   //  Until they are received, use previously saved values.
    app_msg_RequestLatLong();
 
    tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);

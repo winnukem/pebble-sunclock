@@ -10,6 +10,16 @@ The first time the v2 app is run it will put up a message screen while retrievin
 
 # History
 
+2.0.1
+
+Fully initialize text fields before displaying the watchface. Had avoided this due to display hesitations in Pebble v1.x, but Pebble 2.x doesn't have the same difficulty.
+
+2.0.0
+
+Initial port to Pebble version 2 environment.
+
+# Lineage
+
 This version is a tweak of the updates posted by orgemd.
 
 The following changes have been made to orgemd's version:
