@@ -8,6 +8,12 @@ After you install the version 2 sunclock, when you first run it be sure that you
 
 The first time the v2 app is run it will put up a message screen while retrieving location data.  If the retrieval fails an error screen will be displayed.  Once the app has managed to save a usable location, it will use that value immediately when restarted, but still attempt to obtain current location data.  Thus when you travel to a different location, or when daylight savings time changes, simply ensure that your phone is connected to the watch and network, and exit/restart the sunclock watchface.
 
+# Obtaining the Software
+
+The best way to install the Twilight Sunclock is from the Pebble store, so that it is properly tracked by your phone's Pebble application. To obtain it, search the Pebble app store for Twilight Sunclock or click on this image: <a href="http://pblweb.com/appstore/52cbea986e5f7003cf000134" title="Twilight SunClock on the Pebble appstore"><img src="/badge/52cbea986e5f7003cf000134/white/medium/" /></a>
+
+If for some reason that doesn't work, you can also [download Twilight Sunclock from My Pebble Faces](http://www.mypebblefaces.com/apps/21510/9960/).
+
 # History
 
 2.0.1
