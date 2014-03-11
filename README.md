@@ -10,7 +10,7 @@ The first time the v2 app is run it will put up a message screen while retrievin
 
 # Obtaining the Software
 
-The best way to install the Twilight Sunclock is from the Pebble store, so that it is properly tracked by your phone's Pebble application. To obtain it, search the Pebble app store for Twilight Sunclock or [click on this link](http://pblweb.com/appstore/52cbea986e5f7003cf000134" "Twilight SunClock on the Pebble appstore").
+The best way to install the Twilight Sunclock is from the Pebble store, so that it is properly tracked by your phone's Pebble application. To obtain it, search the Pebble app store for Twilight Sunclock or [click on this link](http://pblweb.com/appstore/52cbea986e5f7003cf000134/ "Twilight SunClock on the Pebble appstore").
 
 If for some reason that doesn't work, you can also [download Twilight Sunclock from My Pebble Faces](http://www.mypebblefaces.com/apps/21510/9960/).
 
