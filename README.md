@@ -2,11 +2,7 @@ This is a Pebble watch face, originally created (to the best of my understanding
 
 # Instructions
 
-To use this watchface, your Pebble watch and phone app must be running Pebble's version 2 code.
-
-After you install the version 2 sunclock, when you first run it be sure that your phone is connected both to the watch and to a suitable location source (may be the phone network).  Each time the sunclock watchface is started on the Pebble, it will attempt to connect to the phone and obtain current location and timezone data.  When this is successful, the resulting data will be saved in the Pebble watch's flash for later use.
-
-The first time the v2 app is run it will put up a message screen while retrieving location data.  If the retrieval fails an error screen will be displayed.  Once the app has managed to save a usable location, it will use that value immediately when restarted, but still attempt to obtain current location data.  Thus when you travel to a different location, or when daylight savings time changes, simply ensure that your phone is connected to the watch and network, and exit/restart the sunclock watchface.
+Please refer to the [Twilight Sunclock webpage](http://ewedel.github.io/pebble-sunclock/) for usage information.
 
 # Obtaining the Software
 
