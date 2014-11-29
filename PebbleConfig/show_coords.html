@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<!-- Started by copying from
+--   https://github.com/pebble-hacks/js-configure-demo/blob/master/configurable.html
+-->
+
+<head>
+<title>Current Location Title</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body BGCOLOR="#282828" TEXT="#F0F0F0" style='margin-top:10 margin-left:10'>
+
+<div style="background-color:#0F005E; color:	#CC5200; padding:0.5em">
+<center>Twilight Sunclock</center>
+</div>
+
+<h3>Current Location</h3>
+
+<script language="javascript">
+
+/*jslint evil: true, white: true, sub: true */
+/*global document, window */
+
+   "use strict";
+
+   //   var coords = {
+   //      'lat': fLat,
+   //      'long': fLong,
+   //      'tz-off': utcOffset,
+   //      'err-code': errCode,
+   //      'err-msg': errMsg
+   //   // and optionally, post-decode,
+   //      'place-name': city or feature
+   //      'range': distance, in km
+   //      'region': state
+   //      'country': country
+   //   };
+
+   //  extract coords location / error data provided by js wrapCoords()
+
+   //  NB:  sadly, attempting to access document.location.hash crashes.
+   //       So we do this instead:
+
+   var urlFull = document.URL;
+   var urlParts = urlFull.split('#');
+   var anchor = (urlParts.length > 1) ? urlParts[1] : "";
+   var coords = JSON.parse(decodeURIComponent(anchor));
+
+   var rowSt = "<tr><td align='right'>";
+   document.write("<table align='center'>");
+   document.write(rowSt + "lat: </td><td>" + coords['lat'] + "</td></tr>");
+   document.write(rowSt + "long: </td><td>" + coords['long'] + "</td></tr>");
+   document.write(rowSt + "tz-off: </td><td>" + (-coords['tz-off']/3600) + " hours</td></tr>");
+   if (coords['err-code'] !== 0)
+      {
+      document.write(rowSt + "err-code: </td><td>" + coords['err-code'] + "</td></tr>");
+      document.write(rowSt + "err-msg: </td><td>" + coords['err-msg'] + "</td></tr>");
+      }
+
+   //  NB: jslint doesn't like this typeof form, but the web suggests its the best.
+   //      Oh, and it works (at least on Android).
+   if (typeof coords['place-name'] !== 'undefined')
+      {
+      document.write(rowSt + "nearest place: </td><td>" + coords['place-name'] + "</td></tr>");
+      document.write(rowSt + "distance </td><td>" + coords['range'] + " km</td></td>");
+      document.write(rowSt + "region: </td><td>" + coords['region'] + "</td></tr>");
+      document.write(rowSt + "country: </td><td>" + coords['country'] + "</td></tr>");
+      }
+   else if (coords['err-code'] === 0)
+      {
+      document.write("<tr><td height=2em /></tr>");
+      document.write("<tr><td /><td><button type='submit' id='b-decode'>Decode</button></td></tr>");
+      }
+   document.write("<tr><td height=2em /></tr>");
+   document.write("<tr><td /><td><button type='submit' id='b-done'>Done</button></td></tr>");
+
+   document.write("</table>");
+
+
+   function onLoaded(){
+      // executes when complete page is fully loaded, including all frames, objects and images
+
+      document.getElementById("b-done").addEventListener('click', function() {
+         //  Always have to use a pebblejs://close, at peril of encountering
+         //  intermittent "Error calling method on NPObject" errors.
+//         document.location = "config.html";
+         document.location = "pebblejs://close#show-config";
+      }, false);
+
+      document.getElementById("b-decode").addEventListener('click', function() {
+         document.location = "pebblejs://close#decode-" + anchor;
+      }, false);
+   }
+
+   window.onload = onLoaded;
+
+</script>
+
+
+</body>
+</html>
