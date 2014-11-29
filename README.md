@@ -12,6 +12,10 @@ If for some reason that doesn't work, you can also [download Twilight Sunclock f
 
 # History
 
+2.1
+
+Add configuration pages.  Also switch to two-part version numbers so the Pebble application can (theoretically) auto-upgrade us.
+
 2.0.1
 
 Fully initialize text fields before displaying the watchface. Had avoided this due to display hesitations in Pebble v1.x, but Pebble 2.x doesn't have the same difficulty.
