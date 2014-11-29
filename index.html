@@ -43,9 +43,25 @@
 <h3>
 <a name="instructions" class="anchor" href="#instructions"><span class="octicon octicon-link"></span></a>Instructions</h3>
 
-<p>For this version, no manual configuration is needed or supported: the watchface uses Pebble javascript to retrieve the user's current location and timezone each time it is started. These values are saved in the watch for those occasions when the phone / network connection is unavailable.</p>
+<p>For this version, no manual configuration is needed: the watchface
+uses Pebble javascript to retrieve the user's current location and
+timezone each time it is started. These values are saved in the watch
+for those occasions when the phone / network connection is unavailable.</p>
 
-<p>If you travel to another location or daylight savings time starts or stops, simply ensure that your phone is connected to your Pebble and to a location source (could be the phone network). Then if the Twilight Sunclock watchface is presently running on your Pebble press the watch's menu button (the middle button on the right side) to exit the watchface. Then re-start the Twilight Sunclock watchface on your Pebble. It should reacquire your current location and timezone values (as known by your phone) within a few seconds.</p>
+<p>If you travel to another location or daylight savings time starts or
+stops, simply ensure that your phone is connected to your Pebble and to
+a location source (could be the phone network). Then bring up the
+Twilight Sunclock watchface's settings page on your phone and touch the
+Send button. The watchface display should update to reflect your
+present location within a few seconds.</p>
+       
+<p>Note that, as of September
+2012, the Android Pebble application caches the timezone value and does
+not reflect timezone updates due to changes in location. The actual
+position data is properly refreshed, but timezone data is not. You can
+check for this by using the watchface's settings, and clicking on the
+Show button. To bring the Pebble application's idea of timezone back
+into sync with your present location, reboot your phone.</p>
 
 <h3>
 <a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
