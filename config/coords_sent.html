@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<!-- Started by copying from
+--   https://github.com/pebble-hacks/js-configure-demo/blob/master/configurable.html
+-->
+
+<head>
+<title>Location Sent Title</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body BGCOLOR="#282828" TEXT="#F0F0F0" style='margin-top:10 margin-left:10'>
+
+<div style="background-color:#0F005E; color:	#CC5200; padding:0.5em">
+<center>Twilight Sunclock</center>
+</div>
+
+<h3>Location Sent</h3>
+
+<p>Coordinate send to watch started.<p>
+
+<p>Click Done to return to settings screen.<p>
+
+<p><center>
+   <button type='submit' id='b-done' align='center'>Done</button>
+</center></p>
+
+<script language="javascript">
+
+/*jslint white: true */
+/*global document, window */
+
+   /**
+    *  Executes when complete page is fully loaded, including all
+    *  frames, objects and images  .
+    */
+   function onLoaded() {
+      "use strict";
+
+      document.getElementById("b-done").addEventListener('click', function() {
+         document.location = "pebblejs://close#show-config";
+      }, false);
+   }
+
+   window.onload = onLoaded;
+
+</script>
+
+</body>
+</html>

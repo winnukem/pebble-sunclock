@@ -2,10 +2,10 @@
   "uuid": "deda1158-4285-4a58-a29c-986d1c20bf8c",
   "shortName": "Twilight-Clock",
   "longName": "Twilight-Clock",
-  "capabilities": [ "location" ],
+  "capabilities": [ "location", "configurable" ],
   "companyName": "",
   "versionCode": 2,
-  "versionLabel": "2.0.2",
+  "versionLabel": "2.1",
   "watchapp": {
     "watchface": true
   },
