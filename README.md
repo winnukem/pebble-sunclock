@@ -14,7 +14,7 @@ If for some reason that doesn't work, you can also [download Twilight Sunclock f
 
 2.1
 
-Add configuration pages.  Also switch to two-part version numbers so the Pebble application can (theoretically) auto-upgrade us.
+Add configuration pages.  Also switch to two-part version numbers so the Pebble application can (theoretically) auto-upgrade us.  Switch build from SDK v2.0 beta 6 to SDK v2.8 (yeah, it had been a while).
 
 2.0.1
 
