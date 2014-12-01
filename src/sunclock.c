@@ -593,11 +593,21 @@ void  sunclock_handle_init()
 /**
  *  Called at application shutdown / exit.  Releases all dynamic storage
  *  allocated by \href handle_init() et al.
+ *  
+ *  NB: all except for our main window, since deleting it seems to provoke
+ *      a Pebble "crash" report when our face exits.
  */
 void sunclock_handle_deinit()
 {
 
-   SAFE_DESTROY(window, pWindow);
+//   It appears that, despite what Pebble's guide says
+//     http://developer.getpebble.com/guides/pebble-apps/app-structure/windows
+//   it is _still_ (in SDK v2.8) not safe to destroy our own main window at exit.
+//   In fact, with SDK v2.8 (maybe starting with v2.1?) attempting to destroy
+//   our window when leaving the watchface via (at least) an up/down "scroll"
+//   button press results in an "app crashed" message.  Humbug.
+// 
+//   SAFE_DESTROY(window, pWindow);    // uncomment to cause app crash @ exit
 
    //  Do these here since they're shared with another app window.
    //  The SDK hints that the window unload function might be called

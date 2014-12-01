@@ -27,4 +27,5 @@ Note that the build-reported "free" RAM is used for heap.
 
 03/09/2014  call tick at load 14530 10046    9404  9056      348
 
+12/01/2014  v2.8, no win dstr 14502 10074    9388  9144      244
 
