@@ -6,6 +6,8 @@
 
 #include  "messaging.h"
 
+#include  "testing.h"
+
 #include  <pebble.h>
 
 
@@ -38,7 +40,11 @@ static bool  app_msg_RequestLatLong_internal(void)
 
    bool fMyRet = true;
 
-   Tuplet fetch_tuple = TupletInteger(MSG_KEY_GET_LAT_LONG, 1);
+#if TESTING_DISABLE_LOCATION_REQUEST
+   return true;
+#endif
+
+   Tuplet fetch_tuple = TupletInteger(MSG_KEY_GET_LAT_LONG, 1); 
 
    DictionaryIterator *iter;
    AppMessageResult amRet;

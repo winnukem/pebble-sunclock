@@ -5,6 +5,8 @@
 
 #include  "ConfigData.h"
 
+#include  "testing.h"
+
 
 ///  Version of code's current ConfigDataCurLocation structure layout.
 #define CONFIG_DATA_CUR_VERSION 1
@@ -71,6 +73,9 @@ void  config_data_init()
 
    iRet = persist_read_data(CONFIG_DATA_KEY_CUR_LOCATION,
                             &curLocationCache, sizeof(curLocationCache));
+#if TESTING_DISABLE_CACHE_READ
+   iRet = 0;
+#endif
    if ((iRet < (int) sizeof(curLocationCache)) ||
        (curLocationCache.usVersion != CONFIG_DATA_CUR_VERSION))
    {

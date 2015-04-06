@@ -15,6 +15,7 @@
 #include "config.h"
 #include "ConfigData.h"
 #include "helpers.h"
+#include "MessageWindow.h"
 #include "messaging.h"
 #include "my_math.h"
 #include "suncalc.h"
@@ -100,6 +101,22 @@ TwilightPath* pTwiPathCivil = 0;
 void graphics_night_layer_update_callback(Layer *me, GContext *ctx)
 {
 
+
+   //  Don't do our display hold-off until our message pump is running.
+   //  Calling back a window update handler, of which this is the first,
+   //  is a good way to know.  So now we can check for available data
+   //  and hold off proper clock display until it is found:
+   if (! config_data_location_avail())
+   {
+      //  Probably initial program run: no config data persisted yet.
+      //  Put up a special window informing the user of this.
+      message_window_show_status ("Getting Location",
+                                  "Obtaining initial location data.");
+
+      app_msg_RequestLatLong();
+
+      return;
+   }
 
    GRect layerFrame = layer_get_frame(me);
 
@@ -368,7 +385,7 @@ static void  sunclock_window_load(Window * pMyWindow)
    pFontMediumText = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19));
 
 
-   //BUGBUG - The v2 SDK docs suggest that we should do our base bitmap
+   //  The v2 SDK docs suggest that we should do our base bitmap
    //  graphics directly in the window root layer, rather than creating a
    //  separate layer just for the bitmaps (& not using the base window's layer).
 //   pGraphicsNightLayer = layer_create(layer_get_bounds(window_get_root_layer(pWindow)));
@@ -506,9 +523,8 @@ static void  sunclock_window_load(Window * pMyWindow)
 
    handle_minute_tick(pLocalTime, MINUTE_UNIT);
 
-   //  On window load (i.e., at watchface startup) request latest coords.
-   //  Until they are received, use previously saved values.
-   app_msg_RequestLatLong();
+   //  [Don't do location data load until our message pump is running.]
+//   app_msg_RequestLatLong();
 
    tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
 

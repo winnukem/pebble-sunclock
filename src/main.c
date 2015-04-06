@@ -65,18 +65,11 @@ int  main()
 
    message_window_init();
 
-   if (! config_data_location_avail())
-   {
-      //  Probably initial program run: no config data persisted yet.
-      //  Put up a special window informing the user of this.
-      message_window_show_status ("Getting Location",
-                                  "Obtaining initial location data.");
-
-      //  hope it's ok to call app_message_* before app_event_loop()..
-      app_msg_RequestLatLong();
-
-   }
-
+   //  NB: for iOS it may be important to not block application execution
+   //      before hitting the main event loop.  So we now defer the check
+   //      for available location data until we hit our first ("nighttime")
+   //      layer's drawing routine.  No better "message pump running" proxy
+   //      that I'm aware of.
    app_event_loop(); 
 
    app_msg_deinit();
