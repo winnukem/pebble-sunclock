@@ -65,7 +65,7 @@ var revGeoReq = null;
 
 ///  User ID which we supply to geonames.org - if you fork this repo,
 ///  please use your own geonames account instead of this free, limited-use one.
-var geonamesId = "TwilightSunclock"
+var geonamesId = "TwilightSunclock";
 
 
 function clearOuterTimer() {
