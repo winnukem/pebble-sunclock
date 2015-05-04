@@ -12,6 +12,14 @@ If for some reason that doesn't work, you can also [download Twilight Sunclock f
 
 # History
 
+2.3
+
+Fix a missing semi-colon flagged by jslint in pebble-js-app.js.  Switch build from Pebble SDK v2.8 to v2.9.
+
+2.2
+
+Speculative fix for iOS: delay initial location request send from watch until after watchface's message pump is running.
+
 2.1
 
 Add configuration pages.  Also switch to two-part version numbers so the Pebble application can (theoretically) auto-upgrade us.  Switch build from SDK v2.0 beta 6 to SDK v2.8 (yeah, it had been a while).
