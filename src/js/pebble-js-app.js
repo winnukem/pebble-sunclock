@@ -273,7 +273,7 @@ function asyncReadCoords(sendCoordsToPebble, confirmInitiated) {
  *  
  *  for which the (JSON) response looks like
  *  
- *    {"geonames":[{"distance":"1.1379","toponymName":"Chrüzegg","fcl":"P","name":"Chrüzegg","countryCode":"CH","lng":"9.01488","fcode":"PPLX","geonameId":7910950,"lat":"47.2985"}]}
+ *    (JSON example elided, since iOS Pebble app can't cope!)
  *  
  *  Or maybe that should be "find nearby place name"!
  *  
@@ -285,10 +285,7 @@ function asyncReadCoords(sendCoordsToPebble, confirmInitiated) {
  *  
  *  with a result of
  *  
- *    {"geonames":[{"adminCode1":"SG","lng":"9.01488","distance":"1.1379","geonameId":7910950,"toponymName":"Chrüzegg","countryId":"2658434","fcl":"P","population":0,"countryCode":"CH","name":"Chrüzegg","fclName":"city,
- *    village,...","countryName":"Switzerland","fcodeName":"section
- *    of populated place","adminName1":"Saint
- *    Gallen","lat":"47.2985","fcode":"PPLX"}]}
+ *    (JSON example elided, since iOS Pebble app can't cope!)
  *  
  *  geonames.org also has a timezone lookup, which might be fun
  *  at another time:
