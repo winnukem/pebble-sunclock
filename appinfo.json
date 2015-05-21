@@ -67,6 +67,12 @@
         "file": "fonts/Roboto-Condensed.ttf"
       },
       {
+        "type": "font",
+        "characterRegex": "[:0-9]",
+        "name": "FONT_ROBOTO_CONDENSED_32",
+        "file": "fonts/Roboto-Condensed.ttf"
+      },
+      {
         "type": "png-trans",
         "name": "IMAGE_WATCHFACE",
         "file": "images/watchface.png"

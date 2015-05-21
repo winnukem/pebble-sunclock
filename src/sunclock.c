@@ -377,7 +377,7 @@ static void  sunclock_window_load(Window * pMyWindow)
    pFontMoon = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_MOON_PHASES_SUBSET_30));
 
 #if USE_FONT_RESOURCE
-   pFontCurTime = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_42));
+   pFontCurTime = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_32));
 #else
    pFontCurTime = fonts_get_system_font(FONT_KEY_DROID_SERIF_28_BOLD);
 #endif
