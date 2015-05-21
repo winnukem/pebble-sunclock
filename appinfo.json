@@ -2,7 +2,10 @@
   "uuid": "deda1158-4285-4a58-a29c-986d1c20bf8c",
   "shortName": "Twilight-Clock",
   "longName": "Twilight-Clock",
-  "capabilities": [ "location", "configurable" ],
+  "capabilities": [
+    "location",
+    "configurable"
+  ],
   "companyName": "",
   "versionCode": 2,
   "versionLabel": "2.4",
@@ -17,7 +20,6 @@
     "locationFailCode": 4,
     "locationFailMessage": 5
   },
-
   "resources": {
     "media": [
       {
@@ -70,5 +72,9 @@
         "file": "images/watchface.png"
       }
     ]
-  }
+  },
+  "targetPlatforms": [
+    "aplite"
+  ],
+  "sdkVersion": "3"
 }
