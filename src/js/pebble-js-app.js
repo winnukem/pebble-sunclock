@@ -353,6 +353,48 @@ function reverseGeoCode(coords) {
 
 }  /* end of function reverseGeoCode(coords) */
 
+function showIridiumFlares(flares) {
+   // Dummy
+}
+
+function parseIridiumFlares(str) {
+   var re = /<a href=\"flaredetails.aspx.+?">(.+?)<\/a><\/td><td align="center">(.+?)<\/td><td align="center">\d+?°<\/td><td align="center">(\d+)°.+?<\/td>/g;
+   var flares = [];
+   while ((res = re.exec(body)) != null) {
+      var msg = "Found " + (new Date(res[1] + " GMT")) + ", " + res.slice(2).join(", ");
+      flares.push(
+         {
+            date: new Date(res[1] + " GMT"),
+            brightness: res[2],
+            azimuth: res[3]
+         }
+      );
+   }
+   return flares;
+}
+
+function getIridiumFlares(coords) {
+   reqIridium = new XMLHttpRequest();
+   var url = "http://www.heavens-above.com/IridiumFlares.aspx?lat=" + coords['lat'] +
+             "&lng=" + coords['long'] + "&alt=150&tz=GMT";
+
+   console.log("calling " + url);
+   reqIridium.open('GET', url, false /* use asynchronous */ );
+   reqIridium.onload = function() {
+      if (revGeoReq.readyState === 4 && revGeoReq.status === 200) {
+         var flares = parseIridiumFlares(reqIridium.responseText);
+         showIridiumFlares(flares);
+      }
+   }
+   reqIridium.send(null);
+
+   reqIridiumTimeout = window.setTimeout(function() {
+      reqIridium.abort();
+
+      showIridiumFlares([]);
+      },
+   5000);   // timeout in ms
+}
 
 Pebble.addEventListener("ready",
                         function(e){
