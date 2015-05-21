@@ -56,7 +56,7 @@
       },
       {
         "type": "font",
-        "characterRegex": "[a-zA-Z, :0-9/]",
+        "characterRegex": "[a-zA-Z,. :0-9/)(+-]",
         "name": "FONT_ROBOTO_CONDENSED_19",
         "file": "fonts/Roboto-Condensed.ttf"
       },

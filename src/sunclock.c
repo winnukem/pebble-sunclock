@@ -41,6 +41,7 @@ const VibePattern hour_pattern = {
 #endif
 
 TextLayer *pTextTimeLayer      = 0;
+TextLayer *pIridiumLayer       = 0;
 TextLayer *pTextSunriseLayer   = 0;
 TextLayer *pTextSunsetLayer    = 0;
 TextLayer *pDayOfWeekLayer     = 0;
@@ -61,6 +62,7 @@ GFont pFontMediumText = 0;
 // system font (Raster Gothic 18), doesn't need unloading:
 GFont pFontSmallText = 0;
 
+GFont pFontIridium = 0;
 
 ///  Hour hand bitmap, a transparent png which can rotate to any angle.
 TransRotBmp* pTransRotBmpHourHand = 0;
@@ -327,6 +329,7 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
    static char time_text[] = "00:00";
    static char dow_text[] = "xxx";
    static char mon_text[14];
+   static char iridium_text[] = "12:34 (-4.0)";
 
    strftime(dow_text, sizeof(dow_text), "%a", tick_time);
    strftime(mon_text, sizeof(mon_text), "%b %e, %Y", tick_time);
@@ -342,6 +345,9 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 
    text_layer_set_text(pTextTimeLayer, time_text);
    text_layer_set_text_alignment(pTextTimeLayer, GTextAlignmentCenter);
+
+   text_layer_set_text(pIridiumLayer, iridium_text);
+   text_layer_set_text_alignment(pIridiumLayer, GTextAlignmentCenter);
 
    //  update hour hand position
    transrotbmp_set_angle(pTransRotBmpHourHand,
@@ -384,6 +390,7 @@ static void  sunclock_window_load(Window * pMyWindow)
 
    pFontMediumText = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19));
 
+//   pFontIridium = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_18));
 
    //  The v2 SDK docs suggest that we should do our base bitmap
    //  graphics directly in the window root layer, rather than creating a
@@ -421,7 +428,7 @@ static void  sunclock_window_load(Window * pMyWindow)
    }
 
    // time of day text
-   pTextTimeLayer = text_layer_create(GRect(0, 36, 144, 42));
+   pTextTimeLayer = text_layer_create(GRect(0, 32, 144, 32));
    if (pTextTimeLayer == NULL)
    {
       return;
@@ -431,6 +438,19 @@ static void  sunclock_window_load(Window * pMyWindow)
    text_layer_set_font(pTextTimeLayer, pFontCurTime);
    layer_add_child(window_get_root_layer(pWindow),
                    text_layer_get_layer(pTextTimeLayer));
+
+
+   pIridiumLayer = text_layer_create(GRect(0, 64, 144, 20));
+   if (pIridiumLayer == NULL)
+   {
+      return;
+   }
+
+   text_layer_set_text_color(pIridiumLayer, GColorBlack);
+   text_layer_set_background_color(pIridiumLayer, GColorClear);
+   text_layer_set_font(pIridiumLayer, pFontMediumText);
+   layer_add_child(window_get_root_layer(pWindow),
+                   text_layer_get_layer(pIridiumLayer));
 
    pMoonLayer = text_layer_create(GRect(0, 109, 144, 168 - 115));
    if (pMoonLayer == NULL)
@@ -547,6 +567,7 @@ static void  sunclock_window_unload(Window * pMyWindow)
    SAFE_DESTROY(text_layer, pMonthLayer);
    SAFE_DESTROY(text_layer, pDayOfWeekLayer);
    SAFE_DESTROY(text_layer, pMoonLayer);
+   SAFE_DESTROY(text_layer, pIridiumLayer);
    SAFE_DESTROY(text_layer, pTextTimeLayer);
    SAFE_DESTROY(layer,      pGraphicsNightLayer);
 
