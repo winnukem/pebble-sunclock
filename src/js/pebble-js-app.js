@@ -128,16 +128,24 @@ function locationSuccess(pos) {
 
    clearOuterTimer();
 
-   var coordinates = pos.coords;
+   getIridiumFlares(pos, locationSuccessReal);
+}
 
+function locationSuccessReal(pos, flares) {
+   var coordinates = pos.coords;
    //  getTimezoneOffset() returns minutes, scale to seconds to match C's time_t
    //  Note in the PST (winter) timezone, on Android (CM) 4.2.2, this returns
    //  +8 hours.  So it really is an offset from local time to UTC, and not the
    //  usual -8 hour timezone offset from UTC to local.
    var utcOffset = new Date().getTimezoneOffset() * 60;
+   var flare_string = "00:00 (+3.1)";
+   if (flares[0] != undefined) {
+      flare_string = flares[0].date.getUTCHours() + ":" + flares[0].date.getMinutes() + " (" + flares[0].brightness + ")";
+   }
 
    console.log("location success, sending lat/long " + coordinates.latitude +
-               " / " + coordinates.longitude + ", utcOff secs = " + utcOffset);
+               " / " + coordinates.longitude + ", utcOff secs = " + utcOffset +
+               ", flare = " + flare_string);
 
    if (coordsToPebble) {
       //  Even though the coords are floats sendAppMessage transfers them as int32,
@@ -146,7 +154,8 @@ function locationSuccess(pos) {
       //  string parsing support isn't present.
       Pebble.sendAppMessage({"latitudeData":  Math.round(coordinates.latitude * 1000000),
                             "longitudeData": Math.round(coordinates.longitude * 1000000),
-                            "utcOffset": utcOffset});
+                            "utcOffset": utcOffset/*,
+                            "flare": flare_string*/});
 
       if (showSendInitiatedPage) {
          showSendInitiatedPage = false;
@@ -353,15 +362,10 @@ function reverseGeoCode(coords) {
 
 }  /* end of function reverseGeoCode(coords) */
 
-function showIridiumFlares(flares) {
-   // Dummy
-}
-
 function parseIridiumFlares(str) {
    var re = /<a href=\"flaredetails.aspx.+?">(.+?)<\/a><\/td><td align="center">(.+?)<\/td><td align="center">\d+?°<\/td><td align="center">(\d+)°.+?<\/td>/g;
    var flares = [];
-   while ((res = re.exec(body)) != null) {
-      var msg = "Found " + (new Date(res[1] + " GMT")) + ", " + res.slice(2).join(", ");
+   while ((res = re.exec(str)) != null) {
       flares.push(
          {
             date: new Date(res[1] + " GMT"),
@@ -373,17 +377,19 @@ function parseIridiumFlares(str) {
    return flares;
 }
 
-function getIridiumFlares(coords) {
-   reqIridium = new XMLHttpRequest();
-   var url = "http://www.heavens-above.com/IridiumFlares.aspx?lat=" + coords['lat'] +
-             "&lng=" + coords['long'] + "&alt=150&tz=GMT";
+function getIridiumFlares(pos, callback) {
+   var reqIridium = new XMLHttpRequest();
+   /*
+   var url = "http://www.heavens-above.com/IridiumFlares.aspx?lat=" + pos.coords.latitude +
+             "&lng=" + pos.coords.longitude + "&alt=150&tz=GMT";
+   */
+   var url = "http://img.kmrov.ru/iridium.html";
 
-   console.log("calling " + url);
    reqIridium.open('GET', url, false /* use asynchronous */ );
    reqIridium.onload = function() {
-      if (revGeoReq.readyState === 4 && revGeoReq.status === 200) {
+      if (reqIridium.readyState === 4 && reqIridium.status === 200) {
          var flares = parseIridiumFlares(reqIridium.responseText);
-         showIridiumFlares(flares);
+         callback(pos, flares);
       }
    }
    reqIridium.send(null);
@@ -391,7 +397,7 @@ function getIridiumFlares(coords) {
    reqIridiumTimeout = window.setTimeout(function() {
       reqIridium.abort();
 
-      showIridiumFlares([]);
+      callback(pos, []);
       },
    5000);   // timeout in ms
 }
