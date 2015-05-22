@@ -390,8 +390,6 @@ static void  sunclock_window_load(Window * pMyWindow)
 
    pFontMediumText = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_19));
 
-//   pFontIridium = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_CONDENSED_18));
-
    //  The v2 SDK docs suggest that we should do our base bitmap
    //  graphics directly in the window root layer, rather than creating a
    //  separate layer just for the bitmaps (& not using the base window's layer).
